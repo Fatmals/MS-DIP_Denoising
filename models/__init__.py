@@ -2,6 +2,7 @@ from .skip import skip
 from .texture_nets import get_texture_nets
 from .resnet import ResNet
 from .unet import UNet
+from .multi_scale_dip import MultiScaleNetwork  # Import your new Multi-Scale DIP model
 
 import torch.nn as nn
 
@@ -23,6 +24,11 @@ def get_net(input_depth, NET_TYPE, pad, upsample_mode, n_channels=3, act_fun='Le
         net = UNet(num_input_channels=input_depth, num_output_channels=3, 
                    feature_scale=4, more_layers=0, concat_x=False,
                    upsample_mode=upsample_mode, pad=pad, norm_layer=nn.BatchNorm2d, need_sigmoid=True, need_bias=True)
+    
+    # Add your Multi-Scale DIP model here
+    elif NET_TYPE == 'MultiScaleDIP':  
+        net = MultiScaleNetwork(num_input_channels=input_depth, num_output_channels=n_channels, need_sigmoid=True)
+
     elif NET_TYPE == 'identity':
         assert input_depth == 3
         net = nn.Sequential()
