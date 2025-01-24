@@ -28,7 +28,32 @@ class ListModule(nn.Module):
 
     def __len__(self):
         return len(self._modules)
+#######################
+# NEW 
+#######################
+class ResidualBlock(nn.Module):
+    def __init__(self, in_channels):
+        super(ResidualBlock, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(in_channels)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(in_channels)
 
+    def forward(self, x):
+        identity = x
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out += identity
+        out = self.relu(out)
+        return out
+
+########################
+# Multi-Scale
+########################
 class UNet(nn.Module):
     '''
         upsample_mode in ['deconv', 'nearest', 'bilinear']
@@ -46,11 +71,11 @@ class UNet(nn.Module):
         filters = [64, 128, 256, 512, 1024]
         filters = [x // self.feature_scale for x in filters]
 
-        self.start = unetConv2(num_input_channels, filters[0], norm_layer, need_bias, pad)
-        self.down1 = unetDown(filters[0], filters[1], norm_layer, need_bias, pad)
-        self.down2 = unetDown(filters[1], filters[2], norm_layer, need_bias, pad)
-        self.down3 = unetDown(filters[2], filters[3], norm_layer, need_bias, pad)
-        self.down4 = unetDown(filters[3], filters[4], norm_layer, need_bias, pad)
+        self.start = ResidualBlock(num_input_channels)
+        self.down1 = ResidualBlock(filters[0])
+        self.down2 = ResidualBlock(filters[1])
+        self.down3 = ResidualBlock(filters[2])
+        self.down4 = ResidualBlock(filters[3])
 
         # Intermediate outputs
         self.output1 = nn.Conv2d(filters[1], num_output_channels, 1)
@@ -69,20 +94,20 @@ class UNet(nn.Module):
         )
 
     def forward(self, x):
-        x1 = self.start(x)
-        x2 = self.down1(x1)
-        x3 = self.down2(x2)
-        x4 = self.down3(x3)
-        x5 = self.down4(x4)
+        x = self.start(x)
+        x1 = self.down1(x)
+        x2 = self.down2(x1)
+        x3 = self.down3(x2)
+        x4 = self.down4(x3)
 
         output3 = self.output3(x3)
         output2 = self.output2(x2)
         output1 = self.output1(x1)
 
-        x = self.up4(x5, x4)
-        x = self.up3(x, x3)
-        x = self.up2(x, x2)
-        x = self.up1(x, x1)
+        x = self.up4(x4)
+        x = self.up3(x + x3)
+        x = self.up2(x + x2)
+        x = self.up1(x + x1)
 
         final_output = self.final(x)
         return final_output, output1, output2, output3
