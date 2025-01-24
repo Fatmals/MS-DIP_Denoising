@@ -31,64 +31,127 @@ class ListModule(nn.Module):
 #######################
 # NEW 
 #######################
-class DIPGenerator(nn.Module):
-    def __init__(self, num_channels=64):
-        super(DIPGenerator, self).__init__()
-        # Encoder
-        self.down1 = nn.Conv2d(3, num_channels, 3, stride=2, padding=1)
-        self.down2 = nn.Conv2d(num_channels, num_channels * 2, 3, stride=2, padding=1)
-        # Decoder
-        self.up1 = nn.ConvTranspose2d(num_channels * 2, num_channels, 3, stride=2, padding=1, output_padding=1)
-        self.up2 = nn.ConvTranspose2d(num_channels, 3, 3, stride=2, padding=1, output_padding=1)
-        self.act = nn.ReLU()
 
-    def forward(self, x):
-        # Encoding
-        x = self.act(self.down1(x))
-        x = self.act(self.down2(x))
-        # Decoding
-        x = self.act(self.up1(x))
-        x = self.up2(x)
-        return x
 
 ########################
 # Multi-Scale
 ########################
-class UNet(nn.Module):
-    '''
-        upsample_mode in ['deconv', 'nearest', 'bilinear']
-        pad in ['zero', 'replication', 'none']
-    '''
-   def __init__(self, scales=[1, 0.5, 0.25]):
-        super(UNet, self).__init__()
+
+class MultiScaleUNet(nn.Module):
+    def __init__(self, num_input_channels=3, num_output_channels=3, scales=[1, 0.5, 0.25], feature_scale=4, more_layers=0, concat_x=False, upsample_mode='deconv', pad='zero', norm_layer=nn.InstanceNorm2d, need_sigmoid=True, need_bias=True):
+        super(MultiScaleUNet, self).__init__()
         self.scales = scales
-        self.generators = nn.ModuleList([DIPGenerator() for _ in self.scales])
+        self.generators = nn.ModuleList([self._make_generator(num_input_channels, num_output_channels, feature_scale, more_layers, concat_x, upsample_mode, pad, norm_layer, need_sigmoid, need_bias, scale) for scale in scales])
+
+    def _make_generator(self, num_input_channels, num_output_channels, feature_scale, more_layers, concat_x, upsample_mode, pad, norm_layer, need_sigmoid, need_bias, scale):
+        """ Build a UNet generator for a specific scale. """
+        model = UNet(num_input_channels, num_output_channels, feature_scale, more_layers, concat_x, upsample_mode, pad, norm_layer, need_sigmoid, need_bias)
+        if scale != 1:
+            # Scale the number of input channels according to the scale
+            model.start = unetConv2(int(num_input_channels * scale), model.filters[0], norm_layer, need_bias, pad)
+        return model
 
     def forward(self, x):
-        outputs = []
-        current_input = x
-        for gen in self.generators:
-            # Downsample image to current scale
-            scaled_input = F.interpolate(current_input, scale_factor=self.scales[len(outputs)], mode='bilinear', align_corners=False)
-            output = gen(scaled_input)
-            # Upsample output to original size
+        results = []
+        for scale, generator in zip(self.scales, self.generators):
+            scaled_input = F.interpolate(x, scale_factor=scale, mode='bilinear', align_corners=False)
+            output = generator(scaled_input)
             output = F.interpolate(output, size=(x.size(2), x.size(3)), mode='bilinear', align_corners=False)
-            outputs.append(output)
-            current_input = output  # Use current output as input for the next scale
-
-        # Multi-scale inference ensemble
-        final_output = torch.mean(torch.stack(outputs), dim=0)
+            results.append(output)
+        
+        # Combine the outputs from different scales
+        final_output = sum(results) / len(results)
         return final_output
+        
+class UNet(nn.Module):
+    """ Modified UNet to allow dynamic filter adjustment based on scale """
+    def __init__(self, num_input_channels, num_output_channels, feature_scale, more_layers, concat_x, upsample_mode, pad, norm_layer, need_sigmoid, need_bias):
+        super(UNet, self).__init__()
+        self.feature_scale = feature_scale
+        self.more_layers = more_layers
+        self.concat_x = concat_x
+        self.filters = [x // feature_scale for x in [64, 128, 256, 512, 1024]]
+        self.start = unetConv2(num_input_channels, self.filters[0], norm_layer, need_bias, pad)
+        # Continue with the existing architecture...
+        self.down1 = unetDown(filters[0], filters[1] if not concat_x else filters[1] - num_input_channels, norm_layer, need_bias, pad)
+        self.down2 = unetDown(filters[1], filters[2] if not concat_x else filters[2] - num_input_channels, norm_layer, need_bias, pad)
+        self.down3 = unetDown(filters[2], filters[3] if not concat_x else filters[3] - num_input_channels, norm_layer, need_bias, pad)
+        self.down4 = unetDown(filters[3], filters[4] if not concat_x else filters[4] - num_input_channels, norm_layer, need_bias, pad)
 
-    def train_step(self, input_image, noisy_image):
-        # Assume an optimizer and loss function are defined outside
-        self.train()
-        output = self(input_image)
-        loss = torch.nn.MSELoss()(output, noisy_image)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        return loss.item()
+        # more downsampling layers
+        if self.more_layers > 0:
+            self.more_downs = [
+                unetDown(filters[4], filters[4] if not concat_x else filters[4] - num_input_channels , norm_layer, need_bias, pad) for i in range(self.more_layers)]
+            self.more_ups = [unetUp(filters[4], upsample_mode, need_bias, pad, same_num_filt =True) for i in range(self.more_layers)]
+
+            self.more_downs = ListModule(*self.more_downs)
+            self.more_ups   = ListModule(*self.more_ups)
+
+        self.up4 = unetUp(filters[3], upsample_mode, need_bias, pad)
+        self.up3 = unetUp(filters[2], upsample_mode, need_bias, pad)
+        self.up2 = unetUp(filters[1], upsample_mode, need_bias, pad)
+        self.up1 = unetUp(filters[0], upsample_mode, need_bias, pad)
+
+        self.final = conv(filters[0], num_output_channels, 1, bias=need_bias, pad=pad)
+
+        if need_sigmoid: 
+            self.final = nn.Sequential(self.final, nn.Sigmoid())
+
+    def forward(self, inputs):
+
+        # Downsample 
+        downs = [inputs]
+        down = nn.AvgPool2d(2, 2)
+        for i in range(4 + self.more_layers):
+            downs.append(down(downs[-1]))
+
+        in64 = self.start(inputs)
+        if self.concat_x:
+            in64 = torch.cat([in64, downs[0]], 1)
+
+        down1 = self.down1(in64)
+        if self.concat_x:
+            down1 = torch.cat([down1, downs[1]], 1)
+
+        down2 = self.down2(down1)
+        if self.concat_x:
+            down2 = torch.cat([down2, downs[2]], 1)
+
+        down3 = self.down3(down2)
+        if self.concat_x:
+            down3 = torch.cat([down3, downs[3]], 1)
+
+        down4 = self.down4(down3)
+        if self.concat_x:
+            down4 = torch.cat([down4, downs[4]], 1)
+
+        if self.more_layers > 0:
+            prevs = [down4]
+            for kk, d in enumerate(self.more_downs):
+                # print(prevs[-1].size())
+                out = d(prevs[-1])
+                if self.concat_x:
+                    out = torch.cat([out,  downs[kk + 5]], 1)
+
+                prevs.append(out)
+
+            up_ = self.more_ups[-1](prevs[-1], prevs[-2])
+            for idx in range(self.more_layers - 1):
+                l = self.more_ups[self.more - idx - 2]
+                up_= l(up_, prevs[self.more - idx - 2])
+        else:
+            up_= down4
+
+        up4= self.up4(up_, down3)
+        up3= self.up3(up4, down2)
+        up2= self.up2(up3, down1)
+        up1= self.up1(up2, in64)
+
+        return self.final(up1)
+        
+        # Additional layers and forward method go here as in the original UNet implementation.
+
+# Additional classes like unetConv2, unetDown, unetUp should be updated if necessary to support the scale changes.
 
 
 
