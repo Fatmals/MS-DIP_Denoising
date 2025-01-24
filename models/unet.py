@@ -31,25 +31,25 @@ class ListModule(nn.Module):
 #######################
 # NEW 
 #######################
-class ResidualBlock(nn.Module):
-    def __init__(self, in_channels):
-        super(ResidualBlock, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(in_channels)
-        self.relu = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(in_channels)
+class DIPGenerator(nn.Module):
+    def __init__(self, num_channels=64):
+        super(DIPGenerator, self).__init__()
+        # Encoder
+        self.down1 = nn.Conv2d(3, num_channels, 3, stride=2, padding=1)
+        self.down2 = nn.Conv2d(num_channels, num_channels * 2, 3, stride=2, padding=1)
+        # Decoder
+        self.up1 = nn.ConvTranspose2d(num_channels * 2, num_channels, 3, stride=2, padding=1, output_padding=1)
+        self.up2 = nn.ConvTranspose2d(num_channels, 3, 3, stride=2, padding=1, output_padding=1)
+        self.act = nn.ReLU()
 
     def forward(self, x):
-        identity = x
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.relu(out)
-        out = self.conv2(out)
-        out = self.bn2(out)
-        out += identity
-        out = self.relu(out)
-        return out
+        # Encoding
+        x = self.act(self.down1(x))
+        x = self.act(self.down2(x))
+        # Decoding
+        x = self.act(self.up1(x))
+        x = self.up2(x)
+        return x
 
 ########################
 # Multi-Scale
@@ -59,58 +59,38 @@ class UNet(nn.Module):
         upsample_mode in ['deconv', 'nearest', 'bilinear']
         pad in ['zero', 'replication', 'none']
     '''
-    def __init__(self, num_input_channels=3, num_output_channels=3, 
-                       feature_scale=4, more_layers=0, concat_x=False,
-                       upsample_mode='deconv', pad='zero', norm_layer=nn.InstanceNorm2d, need_sigmoid=True, need_bias=True):
+   def __init__(self, scales=[1, 0.5, 0.25]):
         super(UNet, self).__init__()
-
-        self.feature_scale = feature_scale
-        self.more_layers = more_layers
-        self.concat_x = concat_x
-
-        filters = [64, 128, 256, 512, 1024]
-        filters = [x // self.feature_scale for x in filters]
-
-        self.start = ResidualBlock(num_input_channels)
-        self.down1 = ResidualBlock(filters[0])
-        self.down2 = ResidualBlock(filters[1])
-        self.down3 = ResidualBlock(filters[2])
-        self.down4 = ResidualBlock(filters[3])
-
-        # Intermediate outputs
-        self.output1 = nn.Conv2d(filters[1], num_output_channels, 1)
-        self.output2 = nn.Conv2d(filters[2], num_output_channels, 1)
-        self.output3 = nn.Conv2d(filters[3], num_output_channels, 1)
-
-        # Upsampling layers
-        self.up4 = unetUp(filters[4], upsample_mode, need_bias, pad)
-        self.up3 = unetUp(filters[3], upsample_mode, need_bias, pad)
-        self.up2 = unetUp(filters[2], upsample_mode, need_bias, pad)
-        self.up1 = unetUp(filters[1], upsample_mode, need_bias, pad)
-
-        self.final = nn.Sequential(
-            nn.Conv2d(filters[0], num_output_channels, 1, bias=need_bias, pad=pad),
-            nn.Sigmoid() if need_sigmoid else nn.Identity()
-        )
+        self.scales = scales
+        self.generators = nn.ModuleList([DIPGenerator() for _ in self.scales])
 
     def forward(self, x):
-        x = self.start(x)
-        x1 = self.down1(x)
-        x2 = self.down2(x1)
-        x3 = self.down3(x2)
-        x4 = self.down4(x3)
+        outputs = []
+        current_input = x
+        for gen in self.generators:
+            # Downsample image to current scale
+            scaled_input = F.interpolate(current_input, scale_factor=self.scales[len(outputs)], mode='bilinear', align_corners=False)
+            output = gen(scaled_input)
+            # Upsample output to original size
+            output = F.interpolate(output, size=(x.size(2), x.size(3)), mode='bilinear', align_corners=False)
+            outputs.append(output)
+            current_input = output  # Use current output as input for the next scale
 
-        output3 = self.output3(x3)
-        output2 = self.output2(x2)
-        output1 = self.output1(x1)
+        # Multi-scale inference ensemble
+        final_output = torch.mean(torch.stack(outputs), dim=0)
+        return final_output
 
-        x = self.up4(x4)
-        x = self.up3(x + x3)
-        x = self.up2(x + x2)
-        x = self.up1(x + x1)
+    def train_step(self, input_image, noisy_image):
+        # Assume an optimizer and loss function are defined outside
+        self.train()
+        output = self(input_image)
+        loss = torch.nn.MSELoss()(output, noisy_image)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        return loss.item()
 
-        final_output = self.final(x)
-        return final_output, output1, output2, output3
+
 
 
 
