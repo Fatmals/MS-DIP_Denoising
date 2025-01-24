@@ -32,6 +32,17 @@ class ListModule(nn.Module):
 # NEW 
 #######################
 
+class ScaleConsistencyLoss(nn.Module):
+    def __init__(self):
+        super(ScaleConsistencyLoss, self).__init__()
+
+    def forward(self, outputs):
+        loss = 0
+        for i in range(len(outputs) - 1):
+            fine = outputs[i]
+            coarse = F.interpolate(outputs[i + 1], size=fine.shape[2:], mode='bilinear', align_corners=False)
+            loss += F.mse_loss(fine, coarse)
+        return loss
 
 ########################
 # Multi-Scale
