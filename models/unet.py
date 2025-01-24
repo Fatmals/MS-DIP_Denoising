@@ -29,15 +29,11 @@ class ListModule(nn.Module):
     def __len__(self):
         return len(self._modules)
 
-class UNet(nn.Module):
-    '''
-        upsample_mode in ['deconv', 'nearest', 'bilinear']
-        pad in ['zero', 'replication', 'none']
-    '''
+class MultiScaleUNet(nn.Module):
     def __init__(self, num_input_channels=3, num_output_channels=3, 
                        feature_scale=4, more_layers=0, concat_x=False,
                        upsample_mode='deconv', pad='zero', norm_layer=nn.InstanceNorm2d, need_sigmoid=True, need_bias=True):
-        super(UNet, self).__init__()
+        super(MultiScaleUNet, self).__init__()
 
         self.feature_scale = feature_scale
         self.more_layers = more_layers
