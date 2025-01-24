@@ -39,9 +39,8 @@ class ScaleConsistencyLoss(nn.Module):
     def forward(self, outputs):
         loss = 0
         for i in range(len(outputs) - 1):
-            fine = outputs[i]
-            coarse = F.interpolate(outputs[i + 1], size=fine.shape[2:], mode='bilinear', align_corners=False)
-            loss += F.mse_loss(fine, coarse)
+            current_output = F.interpolate(outputs[i+1], size=outputs[i].size()[2:], mode='bilinear', align_corners=False)
+            loss += F.mse_loss(outputs[i], current_output)
         return loss
 
 ########################
@@ -52,13 +51,14 @@ class MultiScaleUNet(nn.Module):
     def __init__(self, num_input_channels=3, num_output_channels=3, scales=[1, 0.5, 0.25], feature_scale=4, more_layers=0, concat_x=False, upsample_mode='deconv', pad='zero', norm_layer=nn.InstanceNorm2d, need_sigmoid=True, need_bias=True):
         super(MultiScaleUNet, self).__init__()
         self.scales = scales
+        # Initialize a ModuleList of UNet generators, one for each scale
         self.generators = nn.ModuleList([self._make_generator(num_input_channels, num_output_channels, feature_scale, more_layers, concat_x, upsample_mode, pad, norm_layer, need_sigmoid, need_bias, scale) for scale in scales])
 
     def _make_generator(self, num_input_channels, num_output_channels, feature_scale, more_layers, concat_x, upsample_mode, pad, norm_layer, need_sigmoid, need_bias, scale):
         """ Build a UNet generator for a specific scale. """
         model = UNet(num_input_channels, num_output_channels, feature_scale, more_layers, concat_x, upsample_mode, pad, norm_layer, need_sigmoid, need_bias)
         if scale != 1:
-            # Scale the number of input channels according to the scale
+            # Adjust the initial convolution layer to accommodate the scaled input
             model.start = unetConv2(int(num_input_channels * scale), model.filters[0], norm_layer, need_bias, pad)
         return model
 
@@ -73,6 +73,7 @@ class MultiScaleUNet(nn.Module):
         # Combine the outputs from different scales
         final_output = sum(results) / len(results)
         return final_output
+
         
 class UNet(nn.Module):
     """ Modified UNet to allow dynamic filter adjustment based on scale """
