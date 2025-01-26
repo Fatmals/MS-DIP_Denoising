@@ -28,63 +28,27 @@ class ListModule(nn.Module):
 
     def __len__(self):
         return len(self._modules)
-#######################
-# NEW 
-#######################
 
-class ScaleConsistencyLoss(nn.Module):
-    def __init__(self):
-        super(ScaleConsistencyLoss, self).__init__()
-
-    def forward(self, outputs):
-        loss = 0
-        for i in range(len(outputs) - 1):
-            current_output = F.interpolate(outputs[i+1], size=outputs[i].size()[2:], mode='bilinear', align_corners=False)
-            loss += F.mse_loss(outputs[i], current_output)
-        return loss
-
-########################
-# Multi-Scale
-########################
-
-class MultiScaleUNet(nn.Module):
-    def __init__(self, num_input_channels=3, num_output_channels=3, scales=[1, 0.5, 0.25], feature_scale=4, more_layers=0, concat_x=False, upsample_mode='deconv', pad='zero', norm_layer=nn.InstanceNorm2d, need_sigmoid=True, need_bias=True):
-        super(MultiScaleUNet, self).__init__()
-        self.scales = scales
-        # Initialize a ModuleList of UNet generators, one for each scale
-        self.generators = nn.ModuleList([self._make_generator(num_input_channels, num_output_channels, feature_scale, more_layers, concat_x, upsample_mode, pad, norm_layer, need_sigmoid, need_bias, scale) for scale in scales])
-
-    def _make_generator(self, num_input_channels, num_output_channels, feature_scale, more_layers, concat_x, upsample_mode, pad, norm_layer, need_sigmoid, need_bias, scale):
-        """ Build a UNet generator for a specific scale. """
-        model = UNet(num_input_channels, num_output_channels, feature_scale, more_layers, concat_x, upsample_mode, pad, norm_layer, need_sigmoid, need_bias)
-        if scale != 1:
-            # Adjust the initial convolution layer to accommodate the scaled input
-            model.start = unetConv2(int(num_input_channels * scale), model.filters[0], norm_layer, need_bias, pad)
-        return model
-
-    def forward(self, x):
-        results = []
-        for scale, generator in zip(self.scales, self.generators):
-            scaled_input = F.interpolate(x, scale_factor=scale, mode='bilinear', align_corners=False)
-            output = generator(scaled_input)
-            output = F.interpolate(output, size=(x.size(2), x.size(3)), mode='bilinear', align_corners=False)
-            results.append(output)
-        
-        # Combine the outputs from different scales
-        final_output = sum(results) / len(results)
-        return final_output
-
-        
 class UNet(nn.Module):
-    """ Modified UNet to allow dynamic filter adjustment based on scale """
-    def __init__(self, num_input_channels, num_output_channels, feature_scale, more_layers, concat_x, upsample_mode, pad, norm_layer, need_sigmoid, need_bias):
+    '''
+        upsample_mode in ['deconv', 'nearest', 'bilinear']
+        pad in ['zero', 'replication', 'none']
+    '''
+    def __init__(self, num_input_channels=3, num_output_channels=3, 
+                       feature_scale=4, more_layers=0, concat_x=False,
+                       upsample_mode='deconv', pad='zero', norm_layer=nn.InstanceNorm2d, need_sigmoid=True, need_bias=True):
         super(UNet, self).__init__()
+
         self.feature_scale = feature_scale
         self.more_layers = more_layers
         self.concat_x = concat_x
-        self.filters = [x // feature_scale for x in [64, 128, 256, 512, 1024]]
-        self.start = unetConv2(num_input_channels, self.filters[0], norm_layer, need_bias, pad)
-        # Continue with the existing architecture...
+
+
+        filters = [64, 128, 256, 512, 1024]
+        filters = [x // self.feature_scale for x in filters]
+
+        self.start = unetConv2(num_input_channels, filters[0] if not concat_x else filters[0] - num_input_channels, norm_layer, need_bias, pad)
+
         self.down1 = unetDown(filters[0], filters[1] if not concat_x else filters[1] - num_input_channels, norm_layer, need_bias, pad)
         self.down2 = unetDown(filters[1], filters[2] if not concat_x else filters[2] - num_input_channels, norm_layer, need_bias, pad)
         self.down3 = unetDown(filters[2], filters[3] if not concat_x else filters[3] - num_input_channels, norm_layer, need_bias, pad)
@@ -160,13 +124,6 @@ class UNet(nn.Module):
         up1= self.up1(up2, in64)
 
         return self.final(up1)
-        
-        # Additional layers and forward method go here as in the original UNet implementation.
-
-# Additional classes like unetConv2, unetDown, unetUp should be updated if necessary to support the scale changes.
-
-
-
 
 
 
@@ -233,4 +190,3 @@ class unetUp(nn.Module):
         output= self.conv(torch.cat([in1_up, inputs2_], 1))
 
         return output
-
