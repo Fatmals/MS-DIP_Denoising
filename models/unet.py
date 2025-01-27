@@ -78,24 +78,32 @@ class MultiScaleUNet(nn.Module):
 class unetConv2(nn.Module):
     def __init__(self, in_size, out_size, norm_layer, need_bias, pad):
         super(unetConv2, self).__init__()
-
-        print(pad)
-        if norm_layer is not None:
-            self.conv1= nn.Sequential(conv(in_size, out_size, 3, bias=need_bias, pad=pad),
-                                       norm_layer(out_size),
-                                       nn.ReLU(),)
-            self.conv2= nn.Sequential(conv(out_size, out_size, 3, bias=need_bias, pad=pad),
-                                       norm_layer(out_size),
-                                       nn.ReLU(),)
+        
+        # Setup padding
+        if pad == 'reflection':
+            self.padding = nn.ReflectionPad2d(1)
         else:
-            self.conv1= nn.Sequential(conv(in_size, out_size, 3, bias=need_bias, pad=pad),
-                                       nn.ReLU(),)
-            self.conv2= nn.Sequential(conv(out_size, out_size, 3, bias=need_bias, pad=pad),
-                                       nn.ReLU(),)
-    def forward(self, inputs):
-        outputs= self.conv1(inputs)
-        outputs= self.conv2(outputs)
-        return outputs
+            self.padding = nn.ZeroPad2d(1)
+
+        # Convolution block
+        self.conv1 = nn.Sequential(
+            self.padding,
+            nn.Conv2d(in_size, out_size, kernel_size=3, stride=1, bias=need_bias),
+            norm_layer(out_size),
+            nn.ReLU(True),
+        )
+        self.conv2 = nn.Sequential(
+            self.padding,
+            nn.Conv2d(out_size, out_size, kernel_size=3, stride=1, bias=need_bias),
+            norm_layer(out_size),
+            nn.ReLU(True),
+        )
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.conv2(x)
+        return x
+
 
 
 class unetDown(nn.Module):
