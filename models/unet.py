@@ -33,6 +33,7 @@ class ListModule(nn.Module):
 class UNet(nn.Module):
     def __init__(self, num_input_channels=3, num_output_channels=3, feature_scale=4, more_layers=0, concat_x=False, upsample_mode='deconv', pad='zero', norm_layer=nn.InstanceNorm2d, need_sigmoid=True, need_bias=True):
         super(UNet, self).__init__()
+        assert norm_layer is not None, "Normalization layer must be provided"
         self.feature_scale = feature_scale
         self.more_layers = more_layers
         self.concat_x = concat_x
@@ -49,6 +50,7 @@ class UNet(nn.Module):
         self.up2 = unetUp(filters[1], upsample_mode, need_bias, pad)
         self.up1 = unetUp(filters[0], upsample_mode, need_bias, pad)
         self.final = nn.Sequential(nn.Conv2d(filters[0], num_output_channels, 1, bias=need_bias, pad=pad), nn.Sigmoid() if need_sigmoid else nn.Identity())
+
 
     def forward(self, x):
         x = self.start(x)
@@ -67,6 +69,7 @@ class UNet(nn.Module):
 class MultiScaleUNet(nn.Module):
     def __init__(self, scales=[1, 0.5, 0.25], **kwargs):
         super(MultiScaleUNet, self).__init__()
+        assert 'norm_layer' in kwargs and kwargs['norm_layer'] is not None, "norm_layer must be provided in kwargs"
         self.unets = nn.ModuleList([UNet(**kwargs) for _ in scales])
         self.scales = scales
 
@@ -75,9 +78,12 @@ class MultiScaleUNet(nn.Module):
         final_output = sum(outputs) / len(outputs)
         return final_output
 
+
+
 class unetConv2(nn.Module):
     def __init__(self, in_size, out_size, norm_layer, need_bias, pad):
         super(unetConv2, self).__init__()
+        assert norm_layer is not None, "Normalization layer must be provided"
         
         # Setup padding
         if pad == 'reflection':
