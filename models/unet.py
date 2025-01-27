@@ -29,12 +29,7 @@ class ListModule(nn.Module):
     def __len__(self):
         return len(self._modules)
 
-# Configuration setting for choosing the normalization type
-use_instance_norm = True  # This can be set based on an external configuration or condition
 
-# Function to select normalization layer dynamically
-def get_norm_layer(use_instance):
-    return nn.InstanceNorm2d if use_instance else nn.BatchNorm2d
 
 class UNet(nn.Module):
     def __init__(self, num_input_channels=3, num_output_channels=3, feature_scale=4, more_layers=0, concat_x=False, upsample_mode='deconv', pad='zero', norm_layer=nn.InstanceNorm2d, need_sigmoid=True, need_bias=True):
@@ -73,14 +68,18 @@ class UNet(nn.Module):
         return self.final(x)
 
 class MultiScaleUNet(nn.Module):
-    def __init__(self, scales=[1, 0.5, 0.25], **kwargs):
+    def __init__(self, num_input_channels=3, num_output_channels=3, feature_scale=4, more_layers=0, concat_x=False, upsample_mode='deconv', pad='zero', norm_layer=nn.InstanceNorm2d, need_sigmoid=True, need_bias=True, scales=[1, 0.5, 0.25]):
         super(MultiScaleUNet, self).__init__()
-        assert 'norm_layer' in kwargs and kwargs['norm_layer'] is not None, "norm_layer must be provided in kwargs"
-        self.unets = nn.ModuleList([UNet(**kwargs) for _ in scales])
+        self.unets = nn.ModuleList([UNet(num_input_channels, num_output_channels, feature_scale, more_layers, concat_x, upsample_mode, pad, norm_layer, need_sigmoid, need_bias) for _ in scales])
         self.scales = scales
 
     def forward(self, x):
-        outputs = [F.interpolate(unet(F.interpolate(x, scale_factor=scale, mode='bilinear', align_corners=False)), size=x.size()[2:], mode='bilinear', align_corners=False) for unet, scale in zip(self.unets, self.scales)]
+        outputs = []
+        for scale, unet in zip(self.scales, self.unets):
+            scaled_input = F.interpolate(x, scale_factor=scale, mode='bilinear', align_corners=False)
+            output = unet(scaled_input)
+            output = F.interpolate(output, size=x.size()[2:], mode='bilinear', align_corners=False)
+            outputs.append(output)
         final_output = sum(outputs) / len(outputs)
         return final_output
 
