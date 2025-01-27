@@ -79,27 +79,22 @@ class unetConv2(nn.Module):
     def __init__(self, in_size, out_size, norm_layer, need_bias, pad):
         super(unetConv2, self).__init__()
 
-        if pad == 'reflection':
-            self.padding = nn.ReflectionPad2d(1)  # Applies reflection padding
+        print(pad)
+        if norm_layer is not None:
+            self.conv1= nn.Sequential(conv(in_size, out_size, 3, bias=need_bias, pad=pad),
+                                       norm_layer(out_size),
+                                       nn.ReLU(),)
+            self.conv2= nn.Sequential(conv(out_size, out_size, 3, bias=need_bias, pad=pad),
+                                       norm_layer(out_size),
+                                       nn.ReLU(),)
         else:
-            self.padding = nn.ZeroPad2d(1)  # Applies zero padding
-
-        self.conv1 = nn.Sequential(
-            self.padding,
-            nn.Conv2d(in_size, out_size, 3, bias=need_bias),
-            norm_layer(out_size),
-            nn.ReLU(True),
-        )
-        self.conv2 = nn.Sequential(
-            self.padding,
-            nn.Conv2d(out_size, out_size, 3, bias=need_bias),
-            norm_layer(out_size),
-            nn.ReLU(True),
-        )
-
+            self.conv1= nn.Sequential(conv(in_size, out_size, 3, bias=need_bias, pad=pad),
+                                       nn.ReLU(),)
+            self.conv2= nn.Sequential(conv(out_size, out_size, 3, bias=need_bias, pad=pad),
+                                       nn.ReLU(),)
     def forward(self, inputs):
-        outputs = self.conv1(inputs)
-        outputs = self.conv2(outputs)
+        outputs= self.conv1(inputs)
+        outputs= self.conv2(outputs)
         return outputs
 
 
