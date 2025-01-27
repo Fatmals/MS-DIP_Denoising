@@ -78,6 +78,9 @@ class MultiScaleUNet(nn.Module):
         final_output = sum(outputs) / len(outputs)
         return final_output
 
+# Right before creating a new unetConv2 instance
+assert norm_layer is not None, "Normalization layer must be provided"
+layer = unetConv2(..., norm_layer=norm_layer, ...)
 
 
 class unetConv2(nn.Module):
