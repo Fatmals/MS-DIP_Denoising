@@ -3,14 +3,35 @@ from .common_utils import *
 
 
         
-def get_noisy_image(img_np, sigma):
-    """Adds Gaussian noise to an image.
-    
-    Args: 
-        img_np: image, np.array with values from 0 to 1
-        sigma: std of the noise
-    """
-    img_noisy_np = np.clip(img_np + np.random.normal(scale=sigma, size=img_np.shape), 0, 1).astype(np.float32)
-    img_noisy_pil = np_to_pil(img_noisy_np)
+from torchvision.transforms.functional import resize
 
-    return img_noisy_pil, img_noisy_np
+def get_multi_scale_noisy_images(img_np, scales, sigma):
+    """
+    Adds Gaussian noise to an image at multiple scales.
+    
+    Args:
+        img_np: image, np.array with values from 0 to 1
+        scales: list of scales (e.g., [1, 0.5, 0.25]) to generate multi-scale versions
+        sigma: std of the noise
+    
+    Returns:
+        img_noisy_pils: list of PIL images with noise at each scale
+        img_noisy_nps: list of NumPy arrays with noise at each scale
+    """
+    img_noisy_pils = []
+    img_noisy_nps = []
+    
+    for scale in scales:
+        # Downsample image
+        h, w = img_np.shape[1], img_np.shape[2]
+        scaled_img = resize(np_to_pil(img_np), size=(int(h * scale), int(w * scale)))
+        scaled_img_np = pil_to_np(scaled_img)
+        
+        # Add Gaussian noise
+        noisy_img_np = np.clip(scaled_img_np + np.random.normal(scale=sigma, size=scaled_img_np.shape), 0, 1).astype(np.float32)
+        noisy_img_pil = np_to_pil(noisy_img_np)
+        
+        img_noisy_pils.append(noisy_img_pil)
+        img_noisy_nps.append(noisy_img_np)
+    
+    return img_noisy_pils, img_noisy_nps
