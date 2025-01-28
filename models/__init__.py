@@ -7,7 +7,7 @@ import torch.nn as nn
 
 def get_net(input_depth, NET_TYPE, pad, upsample_mode, n_channels=3, act_fun='LeakyReLU', 
             skip_n33d=128, skip_n33u=128, skip_n11=4, num_scales=5, downsample_mode='stride',
-            scales=[1, 0.5, 0.25]):  # Add scales parameter for MultiScaleUNet
+            scales=[1, 0.5, 0.25], norm_layer=nn.BatchNorm2d):  # Add norm_layer here
     if NET_TYPE == 'ResNet':
         net = ResNet(input_depth, 3, 10, 16, 1, nn.BatchNorm2d, False)
     
@@ -25,13 +25,13 @@ def get_net(input_depth, NET_TYPE, pad, upsample_mode, n_channels=3, act_fun='Le
     elif NET_TYPE == 'UNet':
         net = UNet(num_input_channels=input_depth, num_output_channels=3, 
                    feature_scale=4, more_layers=0, concat_x=False,
-                   upsample_mode=upsample_mode, pad=pad, norm_layer=nn.BatchNorm2d, 
+                   upsample_mode=upsample_mode, pad=pad, norm_layer=norm_layer, 
                    need_sigmoid=True, need_bias=True)
 
     elif NET_TYPE == 'MultiScaleUNet':  # Add MultiScaleUNet here
         net = MultiScaleUNet(num_input_channels=input_depth, num_output_channels=3,
                              feature_scale=4, scales=scales,  # Use the scales parameter
-                             upsample_mode=upsample_mode, pad=pad, norm_layer=nn.BatchNorm2d, 
+                             upsample_mode=upsample_mode, pad=pad, norm_layer=norm_layer, 
                              need_sigmoid=True, need_bias=True)
 
     elif NET_TYPE == 'identity':
@@ -42,5 +42,3 @@ def get_net(input_depth, NET_TYPE, pad, upsample_mode, n_channels=3, act_fun='Le
         assert False, f"Unsupported NET_TYPE: {NET_TYPE}"
 
     return net
-
-
