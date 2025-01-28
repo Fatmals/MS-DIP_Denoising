@@ -68,58 +68,52 @@ class UNet(nn.Module):
         return self.final(x)
 
 
-class MultiScaleUNet(UNet):  # Extend your current UNet class
+class MultiScaleUNet(UNet):
     def __init__(self, num_input_channels=3, num_output_channels=3, 
-                 feature_scale=4, scales=[3.5, 3, 2.5],
+                 feature_scale=4, scales=[1, 0.5, 0.25],
                  upsample_mode='deconv', pad='zero', norm_layer=nn.InstanceNorm2d,
                  need_sigmoid=True, need_bias=True):
-        super(MultiScaleUNet, self).__init__(num_input_channels=num_input_channels,
-                                             num_output_channels=num_output_channels,
-                                             feature_scale=feature_scale,
-                                             upsample_mode=upsample_mode,
-                                             pad=pad, norm_layer=norm_layer,
-                                             need_sigmoid=need_sigmoid, need_bias=need_bias)
-        self.scales = scales  # List of scales for multi-scale processing
+        super(MultiScaleUNet, self).__init__(
+            num_input_channels=num_input_channels,
+            num_output_channels=num_output_channels,
+            feature_scale=feature_scale,
+            upsample_mode=upsample_mode,
+            pad=pad, norm_layer=norm_layer,
+            need_sigmoid=need_sigmoid, need_bias=need_bias
+        )
+        self.scales = scales  # Define the scales for multi-scale processing
 
     def forward(self, inputs):
-        multi_scale_outputs = []  # List to store predictions for each scale
-        multi_scale_features = []  # List to store bottleneck features for each scale
-    
-        # Process the input at multiple scales
+        multi_scale_features = []  # Store features for each scale
+
+        # Process input at multiple scales
         for scale in self.scales:
-            # Resize input to the current scale
+            # Resize the input to the current scale
             scaled_input = F.interpolate(inputs, scale_factor=scale, mode='bilinear', align_corners=False)
-    
-            # Encoder path
+            
+            # Encoder path for the scaled input
             in64 = self.start(scaled_input)
             down1 = self.down1(in64)
             down2 = self.down2(down1)
             down3 = self.down3(down2)
             down4 = self.down4(down3)
-    
-            # Save bottleneck features
+
+            # Store the bottleneck features for fusion
             multi_scale_features.append(down4)
-    
-            # Decoder path for this scale
-            up4 = self.up4(down4, down3)
-            up3 = self.up3(up4, down2)
-            up2 = self.up2(up3, down1)
-            up1 = self.up1(up2, in64)
-    
-            # Final output for this scale
-            scale_output = self.final(up1)
-            multi_scale_outputs.append(scale_output)
-    
-        # Fused output using multi-scale features
-        fused_features = torch.cat(multi_scale_features, dim=1)  # Concatenate features across scales
-        fused_up4 = self.up4(fused_features, down3)
-        fused_up3 = self.up3(fused_up4, down2)
-        fused_up2 = self.up2(fused_up3, down1)
-        fused_up1 = self.up1(fused_up2, in64)
-        fused_output = self.final(fused_up1)
-    
-        # Return both multi-scale outputs and the fused output
-        return multi_scale_outputs, fused_output
+
+        # Fuse multi-scale features (e.g., concatenation)
+        fused_features = torch.cat(multi_scale_features, dim=1)  # Concatenate features along the channel dimension
+
+        # Decoder path for fused features
+        up4 = self.up4(fused_features, down3)
+        up3 = self.up3(up4, down2)
+        up2 = self.up2(up3, down1)
+        up1 = self.up1(up2, in64)
+
+        # Final prediction
+        output = self.final(up1)
+        return output
+
 
 
 
