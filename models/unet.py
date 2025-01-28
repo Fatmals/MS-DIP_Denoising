@@ -84,7 +84,7 @@ class MultiScaleUNet(UNet):  # Extend your current UNet class
     def forward(self, inputs):
         multi_scale_outputs = []  # Store predictions for each scale
         multi_scale_features = []  # Store bottleneck features for each scale
-        
+    
         # Process input at multiple scales
         for scale in self.scales:
             # Resize input to current scale
@@ -120,6 +120,7 @@ class MultiScaleUNet(UNet):  # Extend your current UNet class
     
         # Return predictions for each scale and the final fused output
         return multi_scale_outputs, fused_output
+
 
 
 
