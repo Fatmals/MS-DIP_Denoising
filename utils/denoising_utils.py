@@ -8,7 +8,7 @@ from torchvision.transforms.functional import resize
 def get_noisy_image(img_np, sigma, scales=None):
     """
     Adds Gaussian noise to an image, optionally handling multiple scales.
-    
+
     Args: 
         img_np: np.array with values from 0 to 1 (H, W, C)
         sigma: std of the noise
@@ -36,8 +36,12 @@ def get_noisy_image(img_np, sigma, scales=None):
     }
     
     for scale in scales:
-        # Resize the image to the current scale
-        img_scaled = cv2.resize(img_np, (int(img_np.shape[1] * scale), int(img_np.shape[0] * scale)), interpolation=cv2.INTER_LINEAR)
+        # Compute new dimensions
+        new_width = max(1, int(img_np.shape[1] * scale))  # Ensure width is at least 1
+        new_height = max(1, int(img_np.shape[0] * scale))  # Ensure height is at least 1
+        
+        # Resize the image to the current scale using OpenCV
+        img_scaled = cv2.resize(img_np, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
         
         # Add Gaussian noise
         img_noisy_np = np.clip(img_scaled + np.random.normal(scale=sigma, size=img_scaled.shape), 0, 1).astype(np.float32)
@@ -49,3 +53,4 @@ def get_noisy_image(img_np, sigma, scales=None):
         results['noisy_pil'].append(img_noisy_pil)
     
     return results
+
