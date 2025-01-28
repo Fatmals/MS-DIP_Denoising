@@ -7,13 +7,10 @@ import torch.nn as nn
 
 def get_net(input_depth, NET_TYPE, pad, upsample_mode, n_channels=3, act_fun='LeakyReLU', 
             skip_n33d=128, skip_n33u=128, skip_n11=4, num_scales=5, downsample_mode='stride',
-            scales=[2, 2.5, 1.5]):  # Add scales parameter for MultiScaleUNet
-                        
-    if NET_TYPE == 'MultiScaleUNet':  # Add MultiScaleUNet here
-        net = MultiScaleUNet(num_input_channels=input_depth, num_output_channels=3,
-                             feature_scale=4, scales=scales,  # Use the scales parameter
-                             upsample_mode=upsample_mode, pad=pad, norm_layer=nn.BatchNorm2d, 
-                             need_sigmoid=True, need_bias=True)                    
+            scales=[1, 0.5, 0.25]):  # Add scales parameter for MultiScaleUNet
+    if NET_TYPE == 'ResNet':
+        net = ResNet(input_depth, 3, 10, 16, 1, nn.BatchNorm2d, False)
+    
     elif NET_TYPE == 'skip':
         net = skip(input_depth, n_channels, 
                    num_channels_down=[skip_n33d]*num_scales if isinstance(skip_n33d, int) else skip_n33d,
@@ -31,9 +28,11 @@ def get_net(input_depth, NET_TYPE, pad, upsample_mode, n_channels=3, act_fun='Le
                    upsample_mode=upsample_mode, pad=pad, norm_layer=nn.BatchNorm2d, 
                    need_sigmoid=True, need_bias=True)
 
-    elif NET_TYPE == 'ResNet':
-        net = ResNet(input_depth, 3, 10, 16, 1, nn.BatchNorm2d, False)
-    
+    elif NET_TYPE == 'MultiScaleUNet':  # Add MultiScaleUNet here
+        net = MultiScaleUNet(num_input_channels=input_depth, num_output_channels=3,
+                             feature_scale=4, scales=scales,  # Use the scales parameter
+                             upsample_mode=upsample_mode, pad=pad, norm_layer=nn.BatchNorm2d, 
+                             need_sigmoid=True, need_bias=True)
 
     elif NET_TYPE == 'identity':
         assert input_depth == 3
@@ -43,4 +42,5 @@ def get_net(input_depth, NET_TYPE, pad, upsample_mode, n_channels=3, act_fun='Le
         assert False, f"Unsupported NET_TYPE: {NET_TYPE}"
 
     return net
+
 
