@@ -4,33 +4,47 @@ from .common_utils import *
 
 from torchvision.transforms.functional import resize
 
-def get_multi_scale_noisy_images(img_np, scales, sigma):
+def get_noisy_image(img_np, sigma, scales=None):
     """
-    Adds Gaussian noise to an image at multiple scales.
+    Adds Gaussian noise to an image, optionally handling multiple scales.
     
-    Args:
-        img_np: image, np.array with values from 0 to 1
-        scales: list of scales (e.g., [1, 0.5, 0.25]) to generate multi-scale versions
+    Args: 
+        img_np: np.array with values from 0 to 1 (H, W, C)
         sigma: std of the noise
+        scales: list of scales to resize the image to and apply noise
     
     Returns:
-        img_noisy_pils: list of PIL images with noise at each scale
-        img_noisy_nps: list of NumPy arrays with noise at each scale
+        A dictionary with noisy images and their scales:
+            {
+                'scales': [scale1, scale2, ...],
+                'noisy_images': [noisy_img_np1, noisy_img_np2, ...],
+                'noisy_pil': [noisy_img_pil1, noisy_img_pil2, ...]
+            }
     """
-    img_noisy_pils = []
-    img_noisy_nps = []
+    if scales is None:
+        # Default single scale behavior
+        img_noisy_np = np.clip(img_np + np.random.normal(scale=sigma, size=img_np.shape), 0, 1).astype(np.float32)
+        img_noisy_pil = np_to_pil(img_noisy_np)
+        return img_noisy_pil, img_noisy_np
+
+    # Multi-scale handling
+    results = {
+        'scales': [],
+        'noisy_images': [],
+        'noisy_pil': []
+    }
     
     for scale in scales:
-        # Downsample image
-        h, w = img_np.shape[1], img_np.shape[2]
-        scaled_img = resize(np_to_pil(img_np), size=(int(h * scale), int(w * scale)))
-        scaled_img_np = pil_to_np(scaled_img)
+        # Resize the image to the current scale
+        img_scaled = cv2.resize(img_np, (int(img_np.shape[1] * scale), int(img_np.shape[0] * scale)), interpolation=cv2.INTER_LINEAR)
         
         # Add Gaussian noise
-        noisy_img_np = np.clip(scaled_img_np + np.random.normal(scale=sigma, size=scaled_img_np.shape), 0, 1).astype(np.float32)
-        noisy_img_pil = np_to_pil(noisy_img_np)
+        img_noisy_np = np.clip(img_scaled + np.random.normal(scale=sigma, size=img_scaled.shape), 0, 1).astype(np.float32)
+        img_noisy_pil = np_to_pil(img_noisy_np)
         
-        img_noisy_pils.append(noisy_img_pil)
-        img_noisy_nps.append(noisy_img_np)
+        # Append results
+        results['scales'].append(scale)
+        results['noisy_images'].append(img_noisy_np)
+        results['noisy_pil'].append(img_noisy_pil)
     
-    return img_noisy_pils, img_noisy_nps
+    return results
