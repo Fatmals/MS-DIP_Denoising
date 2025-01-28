@@ -70,7 +70,7 @@ class UNet(nn.Module):
 
 class MultiScaleUNet(UNet):
     def __init__(self, num_input_channels=3, num_output_channels=3, 
-                 feature_scale=4, scales=[1, 0.5, 0.25],
+                 feature_scale=4, scales=[2.5, 2, 1.5],
                  upsample_mode='deconv', pad='zero', norm_layer=nn.InstanceNorm2d,
                  need_sigmoid=True, need_bias=True):
         super(MultiScaleUNet, self).__init__(
