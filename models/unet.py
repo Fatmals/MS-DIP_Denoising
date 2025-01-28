@@ -67,21 +67,51 @@ class UNet(nn.Module):
         x = self.up1(x)
         return self.final(x)
 
-class MultiScaleUNet(nn.Module):
-    def __init__(self, num_input_channels=3, num_output_channels=3, feature_scale=4, more_layers=0, concat_x=False, upsample_mode='deconv', pad='zero', norm_layer=nn.InstanceNorm2d, need_sigmoid=True, need_bias=True, scales=[1, 0.5, 0.25]):
-        super(MultiScaleUNet, self).__init__()
-        self.unets = nn.ModuleList([UNet(num_input_channels, num_output_channels, feature_scale, more_layers, concat_x, upsample_mode, pad, norm_layer, need_sigmoid, need_bias) for _ in scales])
-        self.scales = scales
 
-    def forward(self, x):
-        outputs = []
-        for scale, unet in zip(self.scales, self.unets):
-            scaled_input = F.interpolate(x, scale_factor=scale, mode='bilinear', align_corners=False)
-            output = unet(scaled_input)
-            output = F.interpolate(output, size=x.size()[2:], mode='bilinear', align_corners=False)
-            outputs.append(output)
-        final_output = sum(outputs) / len(outputs)
-        return final_output
+class MultiScaleUNet(UNet):  # Extend your current UNet class
+    def __init__(self, num_input_channels=3, num_output_channels=3, 
+                 feature_scale=4, scales=[1, 0.5, 0.25],
+                 upsample_mode='deconv', pad='zero', norm_layer=nn.InstanceNorm2d,
+                 need_sigmoid=True, need_bias=True):
+        super(MultiScaleUNet, self).__init__(num_input_channels=num_input_channels,
+                                             num_output_channels=num_output_channels,
+                                             feature_scale=feature_scale,
+                                             upsample_mode=upsample_mode,
+                                             pad=pad, norm_layer=norm_layer,
+                                             need_sigmoid=need_sigmoid, need_bias=need_bias)
+        self.scales = scales  # List of scales for multi-scale processing
+
+    def forward(self, inputs):
+        multi_scale_features = []
+        
+        # Process input at multiple scales
+        for scale in self.scales:
+            # Resize input to current scale
+            scaled_input = F.interpolate(inputs, scale_factor=scale, mode='bilinear', align_corners=False)
+            
+            # Use the existing UNet encoder
+            in64 = self.start(scaled_input)
+            down1 = self.down1(in64)
+            down2 = self.down2(down1)
+            down3 = self.down3(down2)
+            down4 = self.down4(down3)
+            
+            # Save bottleneck features for fusion
+            multi_scale_features.append(down4)
+
+        # Fuse multi-scale features (e.g., concatenation)
+        fused_features = torch.cat(multi_scale_features, dim=1)  # Concatenate along channel dimension
+
+        # Use the existing decoder path
+        up4 = self.up4(fused_features, down3)
+        up3 = self.up3(up4, down2)
+        up2 = self.up2(up3, down1)
+        up1 = self.up1(up2, in64)
+
+        # Final output layer
+        output = self.final(up1)
+        return output
+
 
 
 class unetConv2(nn.Module):
