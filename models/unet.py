@@ -125,26 +125,11 @@ class unetUp(nn.Module):
         super(unetUp, self).__init__()
 
         num_filt = out_size if same_num_filt else out_size * 2
-        if upsample_mode == 'deconv':
-            self.up= nn.ConvTranspose2d(num_filt, out_size, 4, stride=2, padding=1)
-            self.conv= unetConv2(out_size * 2, out_size, None, need_bias, pad)
-        elif upsample_mode=='bilinear' or upsample_mode=='nearest':
-            self.up = nn.Sequential(nn.Upsample(scale_factor=2, mode=upsample_mode),
-                                   conv(num_filt, out_size, 3, bias=need_bias, pad=pad))
-            self.conv= unetConv2(out_size * 2, out_size, None, need_bias, pad)
-        else:
-            assert False
+        self.up = nn.Upsample(scale_factor=2, mode=upsample_mode)
+        self.conv = unetConv2(num_filt, out_size, None, need_bias, pad)
 
     def forward(self, inputs1, inputs2):
-        in1_up= self.up(inputs1)
-        
-        if (inputs2.size(2) != in1_up.size(2)) or (inputs2.size(3) != in1_up.size(3)):
-            diff2 = (inputs2.size(2) - in1_up.size(2)) // 2 
-            diff3 = (inputs2.size(3) - in1_up.size(3)) // 2 
-            inputs2_ = inputs2[:, :, diff2 : diff2 + in1_up.size(2), diff3 : diff3 + in1_up.size(3)]
-        else:
-            inputs2_ = inputs2
-
-        output= self.conv(torch.cat([in1_up, inputs2_], 1))
-
+        in1_up = self.up(inputs1)
+        inputs2 = F.interpolate(inputs2, size=in1_up.shape[2:], mode='bilinear', align_corners=True)
+        output = self.conv(torch.cat([in1_up, inputs2], 1))
         return output
