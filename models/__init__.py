@@ -13,7 +13,7 @@ def get_net(input_depth, NET_TYPE, pad, upsample_mode, n_channels=3, act_fun='Le
     
     if net_type == 'MultiScaleUNet':
             if scales is None:
-            scales = [2.5, 2, 1.5]  # Default scales
+                        scales = [2.5, 2, 1.5]  # Default scales
             
             # Ensure norm_layer is explicitly provided, otherwise use InstanceNorm2d as default
             if norm_layer is None:
