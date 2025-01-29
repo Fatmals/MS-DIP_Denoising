@@ -96,7 +96,7 @@ def bn(num_features):
     return nn.BatchNorm2d(num_features)
 
 
-def conv(in_f, out_f, kernel_size, stride=1, bias=True, pad='zero', downsample_mode='stride'):
+def conv(in_f, out_f, kernel_size, stride=1, bias=True, pad='zero', downsample_mode='stride', dilation=1):
     downsampler = None
     if stride != 1 and downsample_mode != 'stride':
 
@@ -104,21 +104,22 @@ def conv(in_f, out_f, kernel_size, stride=1, bias=True, pad='zero', downsample_m
             downsampler = nn.AvgPool2d(stride, stride)
         elif downsample_mode == 'max':
             downsampler = nn.MaxPool2d(stride, stride)
-        elif downsample_mode  in ['lanczos2', 'lanczos3']:
+        elif downsample_mode in ['lanczos2', 'lanczos3']:
             downsampler = Downsampler(n_planes=out_f, factor=stride, kernel_type=downsample_mode, phase=0.5, preserve_size=True)
         else:
             assert False
 
-        stride = 1
+        stride = 1  # Reset stride since downsampling is handled separately
 
     padder = None
-    to_pad = int((kernel_size - 1) / 2)
+    to_pad = dilation * (kernel_size - 1) // 2  # Adjust padding for dilation
+
     if pad == 'reflection':
         padder = nn.ReflectionPad2d(to_pad)
-        to_pad = 0
-  
-    convolver = nn.Conv2d(in_f, out_f, kernel_size, stride, padding=to_pad, bias=bias)
+        to_pad = 0  # No need for additional padding in Conv2D
 
+    # Updated convolution to include dilation
+    convolver = nn.Conv2d(in_f, out_f, kernel_size, stride, padding=to_pad, bias=bias, dilation=dilation)
 
     layers = filter(lambda x: x is not None, [padder, convolver, downsampler])
     return nn.Sequential(*layers)
