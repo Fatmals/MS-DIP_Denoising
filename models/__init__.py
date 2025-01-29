@@ -5,7 +5,7 @@ from .unet import UNet, MultiScaleUNet  # Import MultiScaleUNet
 
 import torch.nn as nn
 
-def get_net(input_depth, NET_TYPE, pad, upsample_mode, n_channels=3, act_fun='LeakyReLU',
+def get_net(input_depth, net_type, pad, upsample_mode, n_channels=3, act_fun='LeakyReLU',
             skip_n33d=128, skip_n33u=128, skip_n11=4, num_scales=5, downsample_mode='stride',
             scales=None, norm_layer=nn.BatchNorm2d):  # Default norm_layer
 
@@ -30,7 +30,7 @@ def get_net(input_depth, NET_TYPE, pad, upsample_mode, n_channels=3, act_fun='Le
                         need_bias=True
         )
 
-    elif NET_TYPE == 'UNet':
+    elif net_type == 'UNet':
         net = UNet(
             num_input_channels=input_depth,
             num_output_channels=n_channels,
