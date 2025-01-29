@@ -29,126 +29,83 @@ class ListModule(nn.Module):
     def __len__(self):
         return len(self._modules)
 
-
-
 class UNet(nn.Module):
-    def __init__(self, num_input_channels=3, num_output_channels=3, feature_scale=4, more_layers=0, concat_x=False, upsample_mode='deconv', pad='zero', norm_layer=nn.InstanceNorm2d, need_sigmoid=True, need_bias=True):
+    def __init__(self, num_input_channels=3, num_output_channels=3, 
+                 feature_scale=4, more_layers=0, concat_x=False,
+                 upsample_mode='deconv', pad='zero', norm_layer=nn.InstanceNorm2d,
+                 need_sigmoid=True, need_bias=True):
         super(UNet, self).__init__()
-        assert norm_layer is not None, "Normalization layer must be provided"
+
         self.feature_scale = feature_scale
         self.more_layers = more_layers
         self.concat_x = concat_x
+
         filters = [64, 128, 256, 512, 1024]
         filters = [x // self.feature_scale for x in filters]
+
+        # Using Dilated Convolutions in deeper layers for a larger receptive field
         self.start = unetConv2(num_input_channels, filters[0], norm_layer, need_bias, pad)
         self.down1 = unetDown(filters[0], filters[1], norm_layer, need_bias, pad)
-        self.down2 = unetDown(filters[1], filters[2], norm_layer, need_bias, pad)
-        self.down3 = unetDown(filters[2], filters[3], norm_layer, need_bias, pad)
-        self.down4 = unetDown(filters[3], filters[4], norm_layer, need_bias, pad)
-        self.more_downs = ListModule(*[unetDown(filters[4], filters[4], norm_layer, need_bias, pad) for _ in range(more_layers)])
+        self.down2 = unetDown(filters[1], filters[2], norm_layer, need_bias, pad, dilation=2)
+        self.down3 = unetDown(filters[2], filters[3], norm_layer, need_bias, pad, dilation=4)
+        self.down4 = unetDown(filters[3], filters[4], norm_layer, need_bias, pad, dilation=8)
+
+        # Multi-Scale Feature Fusion
+        self.fuse_conv = nn.Conv2d(filters[1] + filters[2] + filters[3] + filters[4], filters[3], kernel_size=1, bias=False)
+
         self.up4 = unetUp(filters[3], upsample_mode, need_bias, pad)
         self.up3 = unetUp(filters[2], upsample_mode, need_bias, pad)
         self.up2 = unetUp(filters[1], upsample_mode, need_bias, pad)
         self.up1 = unetUp(filters[0], upsample_mode, need_bias, pad)
-        self.final = nn.Sequential(nn.Conv2d(filters[0], num_output_channels, 1, bias=need_bias, pad=pad), nn.Sigmoid() if need_sigmoid else nn.Identity())
 
-
-    def forward(self, x):
-        x = self.start(x)
-        x = self.down1(x)
-        x = self.down2(x)
-        x = self.down3(x)
-        x = self.down4(x)
-        for layer in self.more_downs:
-            x = layer(x)
-        x = self.up4(x)
-        x = self.up3(x)
-        x = self.up2(x)
-        x = self.up1(x)
-        return self.final(x)
-
-
-class MultiScaleUNet(UNet):
-    def __init__(self, num_input_channels=3, num_output_channels=3, 
-                 feature_scale=4, scales=[2.5, 2, 1.5],
-                 upsample_mode='deconv', pad='zero', norm_layer=nn.InstanceNorm2d,
-                 need_sigmoid=True, need_bias=True):
-        super(MultiScaleUNet, self).__init__(
-            num_input_channels=num_input_channels,
-            num_output_channels=num_output_channels,
-            feature_scale=feature_scale,
-            upsample_mode=upsample_mode,
-            pad=pad, norm_layer=norm_layer,
-            need_sigmoid=need_sigmoid, need_bias=need_bias
-        )
-        self.scales = scales  # Define the scales for multi-scale processing
+        self.final = conv(filters[0], num_output_channels, 1, bias=need_bias, pad=pad)
+        if need_sigmoid:
+            self.final = nn.Sequential(self.final, nn.Sigmoid())
 
     def forward(self, inputs):
-        multi_scale_features = []  # Store features for each scale
+        in64 = self.start(inputs)
+        down1 = self.down1(in64)
+        down2 = self.down2(down1)
+        down3 = self.down3(down2)
+        down4 = self.down4(down3)
 
-        # Process input at multiple scales
-        for scale in self.scales:
-            # Resize the input to the current scale
-            scaled_input = F.interpolate(inputs, scale_factor=scale, mode='bilinear', align_corners=False)
-            
-            # Encoder path for the scaled input
-            in64 = self.start(scaled_input)
-            down1 = self.down1(in64)
-            down2 = self.down2(down1)
-            down3 = self.down3(down2)
-            down4 = self.down4(down3)
+        # Multi-Scale Feature Fusion
+        fused_features = torch.cat([F.interpolate(down1, size=down4.shape[2:], mode='bilinear', align_corners=True),
+                                    F.interpolate(down2, size=down4.shape[2:], mode='bilinear', align_corners=True),
+                                    F.interpolate(down3, size=down4.shape[2:], mode='bilinear', align_corners=True),
+                                    down4], dim=1)
+        down4 = self.fuse_conv(fused_features)
 
-            # Store the bottleneck features for fusion
-            multi_scale_features.append(down4)
-
-        # Fuse multi-scale features (e.g., concatenation)
-        fused_features = torch.cat(multi_scale_features, dim=1)  # Concatenate features along the channel dimension
-
-        # Decoder path for fused features
-        up4 = self.up4(fused_features, down3)
+        up4 = self.up4(down4, down3)
         up3 = self.up3(up4, down2)
         up2 = self.up2(up3, down1)
         up1 = self.up1(up2, in64)
 
-        # Final prediction
-        output = self.final(up1)
-        return output
-
-
-
+        return self.final(up1)
 
 
 
 class unetConv2(nn.Module):
     def __init__(self, in_size, out_size, norm_layer, need_bias, pad):
         super(unetConv2, self).__init__()
-        assert norm_layer is not None, "Normalization layer must be provided"
-        
-        # Setup padding
-        if pad == 'reflection':
-            self.padding = nn.ReflectionPad2d(1)
+
+        print(pad)
+        if norm_layer is not None:
+            self.conv1= nn.Sequential(conv(in_size, out_size, 3, bias=need_bias, pad=pad),
+                                       norm_layer(out_size),
+                                       nn.ReLU(),)
+            self.conv2= nn.Sequential(conv(out_size, out_size, 3, bias=need_bias, pad=pad),
+                                       norm_layer(out_size),
+                                       nn.ReLU(),)
         else:
-            self.padding = nn.ZeroPad2d(1)
-
-        # Convolution block
-        self.conv1 = nn.Sequential(
-            self.padding,
-            nn.Conv2d(in_size, out_size, kernel_size=3, stride=1, bias=need_bias),
-            norm_layer(out_size),
-            nn.ReLU(True),
-        )
-        self.conv2 = nn.Sequential(
-            self.padding,
-            nn.Conv2d(out_size, out_size, kernel_size=3, stride=1, bias=need_bias),
-            norm_layer(out_size),
-            nn.ReLU(True),
-        )
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.conv2(x)
-        return x
-
+            self.conv1= nn.Sequential(conv(in_size, out_size, 3, bias=need_bias, pad=pad),
+                                       nn.ReLU(),)
+            self.conv2= nn.Sequential(conv(out_size, out_size, 3, bias=need_bias, pad=pad),
+                                       nn.ReLU(),)
+    def forward(self, inputs):
+        outputs= self.conv1(inputs)
+        outputs= self.conv2(outputs)
+        return outputs
 
 
 class unetDown(nn.Module):
