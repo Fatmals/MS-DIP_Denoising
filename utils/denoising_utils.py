@@ -3,14 +3,16 @@ from .common_utils import *
 
 
         
-def get_noisy_image(img_np, sigma):
-    """Adds Gaussian noise to an image.
-    
-    Args: 
-        img_np: image, np.array with values from 0 to 1
-        sigma: std of the noise
+def get_noisy_image(img_np, sigma_list):
     """
-    img_noisy_np = np.clip(img_np + np.random.normal(scale=sigma, size=img_np.shape), 0, 1).astype(np.float32)
-    img_noisy_pil = np_to_pil(img_noisy_np)
-
-    return img_noisy_pil, img_noisy_np
+    Adds synthetic noise at multiple scales.
+    img_np: Original image (numpy array).
+    sigma_list: List of noise levels corresponding to different scales.
+    Returns a list of noisy images at different scales.
+    """
+    noisy_images = []
+    for sigma in sigma_list:
+        noise = np.random.normal(scale=sigma, size=img_np.shape)
+        img_noisy = np.clip(img_np + noise, 0, 1)
+        noisy_images.append(img_noisy)
+    return noisy_images
