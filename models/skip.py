@@ -99,3 +99,25 @@ def skip(
 
     return model
 
+
+def multi_scale_skip(input_depth, num_output_channels, scales, pad='reflection'):
+    """
+    Constructs a multi-scale version of the skip network.
+    Processes images at different scales and fuses results.
+    """
+    from skip import skip  # Import the existing skip model
+    
+    models = []
+    for scale in scales:
+        model = skip(
+            input_depth, num_output_channels,
+            num_channels_down=[8, 16, 32, 64, 128],
+            num_channels_up=[8, 16, 32, 64, 128],
+            num_channels_skip=[0, 0, 0, 4, 4],
+            upsample_mode='bilinear',
+            need_sigmoid=True, need_bias=True, pad=pad, act_fun='LeakyReLU'
+        )
+        models.append(model)
+    
+    return models
+
