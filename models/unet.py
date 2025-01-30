@@ -126,12 +126,13 @@ class UNet(nn.Module):
         return self.final(up1)
 
 class MultiScaleUNet(nn.Module):
-    def __init__(self, base_unet):
+    def __init__(self, unet_models):
         """
-        A wrapper model that applies U-Net at multiple scales and fuses the results.
+        A wrapper model that applies multiple U-Net models at different scales
+        and fuses the results.
         """
         super(MultiScaleUNet, self).__init__()
-        self.base_unet = base_unet
+        self.unet_models = nn.ModuleList(unet_models)  # Store multiple U-Nets
 
     def forward(self, noisy_images):
         """
@@ -139,8 +140,8 @@ class MultiScaleUNet(nn.Module):
         noisy_images: list of tensors at different scales.
         Returns: Fused denoised output.
         """
-        denoised_outputs = [self.base_unet(img) for img in noisy_images]
-        final_output = torch.stack(denoised_outputs, dim=0).mean(dim=0)
+        denoised_outputs = [model(img) for model, img in zip(self.unet_models, noisy_images)]
+        final_output = torch.stack(denoised_outputs, dim=0).mean(dim=0)  # Average fusion
         return final_output
 
 
