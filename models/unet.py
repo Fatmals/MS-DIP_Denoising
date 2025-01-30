@@ -126,6 +126,25 @@ class UNet(nn.Module):
         return self.final(up1)
 
 
+class UNetMultiScale(nn.Module):
+    """UNet modified for multi-scale input processing."""
+    def __init__(self, base_unet):
+        super(UNetMultiScale, self).__init__()
+        self.base_unet = base_unet
+        self.fusion_layer = nn.Conv2d(6, 3, kernel_size=1)  # Learnable fusion layer
+
+    def forward(self, pyramid_inputs):
+        outputs = [self.base_unet(inp) for inp in pyramid_inputs]
+
+        # Concatenate and use a learnable fusion layer
+        for i in range(len(outputs) - 1, 0, -1):
+            upsampled = F.interpolate(outputs[i], size=outputs[i - 1].shape[-2:], mode='bilinear')
+            outputs[i - 1] = self.fusion_layer(torch.cat([outputs[i - 1], upsampled], dim=1))  # Learnable fusion
+
+        return outputs[0]  # Final merged output
+
+
+
 
 class unetConv2(nn.Module):
     def __init__(self, in_size, out_size, norm_layer, need_bias, pad):
