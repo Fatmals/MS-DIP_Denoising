@@ -105,7 +105,7 @@ def multi_scale_skip(input_depth, num_output_channels, scales, pad='reflection')
     Constructs a multi-scale version of the skip network.
     Processes images at different scales and fuses results.
     """
-    from skip import skip  # Import the existing skip model
+    from .skip import skip # Import the existing skip model
     
     models = []
     for scale in scales:
