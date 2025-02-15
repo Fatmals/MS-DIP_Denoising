@@ -7,7 +7,7 @@ def skip(
         num_channels_down=[16, 32, 64, 128, 128], num_channels_up=[16, 32, 64, 128, 128], num_channels_skip=[4, 4, 4, 4, 4], 
         filter_size_down=3, filter_size_up=3, filter_skip_size=1,
         need_sigmoid=True, need_bias=True, 
-        pad='zero', upsample_mode='nearest', downsample_mode='stride', act_fun='ReLU', 
+        pad='zero', upsample_mode='nearest', downsample_mode='stride', act_fun='LeakyReLU', 
         need1x1_up=True):
     """Assembles encoder-decoder with skip connections.
 
@@ -115,7 +115,7 @@ def multi_scale_skip(input_depth, num_output_channels, scales, pad='reflection')
             num_channels_up=[8, 16, 32, 64, 128],
             num_channels_skip=[0, 0, 0, 4, 4],
             upsample_mode='bilinear',
-            need_sigmoid=True, need_bias=True, pad=pad, act_fun='ReLU'
+            need_sigmoid=True, need_bias=True, pad=pad, act_fun='LeakyReLU'
         )
         models.append(model)
     
