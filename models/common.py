@@ -73,7 +73,7 @@ class Swish(nn.Module):
         return x * self.s(x)
 
 
-def act(act_fun = 'ReLU'):
+def act(act_fun = 'LeakyReLU'):
     '''
         Either string defining an activation function or module (e.g. nn.ReLU)
     '''
