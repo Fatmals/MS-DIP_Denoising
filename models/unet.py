@@ -30,6 +30,10 @@ class ListModule(nn.Module):
         return len(self._modules)
 
 class UNet(nn.Module):
+    '''
+        upsample_mode in ['deconv', 'nearest', 'bilinear']
+        pad in ['zero', 'replication', 'none']
+    '''
     def __init__(self, num_input_channels=3, num_output_channels=3, 
                        feature_scale=4, more_layers=0, concat_x=False,
                        upsample_mode='deconv', pad='zero', norm_layer=nn.InstanceNorm2d, need_sigmoid=True, need_bias=True):
@@ -39,56 +43,87 @@ class UNet(nn.Module):
         self.more_layers = more_layers
         self.concat_x = concat_x
 
-        filters = [64, 128, 256, 512]  # Removed the deepest layer 1024
+
+        filters = [64, 128, 256, 512, 1024]
         filters = [x // self.feature_scale for x in filters]
 
-        self.start = unetConv2(num_input_channels, filters[0], norm_layer, need_bias, pad)
+        self.start = unetConv2(num_input_channels, filters[0] if not concat_x else filters[0] - num_input_channels, norm_layer, need_bias, pad)
 
-        self.down1 = unetDown(filters[0], filters[1], norm_layer, need_bias, pad)
-        self.down2 = unetDown(filters[1], filters[2], norm_layer, need_bias, pad)
-        self.down3 = unetDown(filters[2], filters[3], norm_layer, need_bias, pad)
-        # Removed down4
+        self.down1 = unetDown(filters[0], filters[1] if not concat_x else filters[1] - num_input_channels, norm_layer, need_bias, pad)
+        self.down2 = unetDown(filters[1], filters[2] if not concat_x else filters[2] - num_input_channels, norm_layer, need_bias, pad)
+        self.down3 = unetDown(filters[2], filters[3] if not concat_x else filters[3] - num_input_channels, norm_layer, need_bias, pad)
+        self.down4 = unetDown(filters[3], filters[4] if not concat_x else filters[4] - num_input_channels, norm_layer, need_bias, pad)
 
-        self.up3 = unetUp(filters[3], upsample_mode, need_bias, pad)  # Adjusted the parameters accordingly
-        self.up2 = unetUp(filters[2], upsample_mode, need_bias, pad)
-        self.up1 = unetUp(filters[1], upsample_mode, need_bias, pad)
+        # more downsampling layers
+        if self.more_layers > 0:
+            self.more_downs = [
+                unetDown(filters[4], filters[4] if not concat_x else filters[4] - num_input_channels , norm_layer, need_bias, pad) for i in range(self.more_layers)]
+            self.more_ups = [unetUp(filters[4], upsample_mode, need_bias, pad, same_num_filt =True) for i in range(self.more_layers)]
+
+            self.more_downs = ListModule(*self.more_downs)
+            self.more_ups   = ListModule(*self.more_ups)
+
+        self.up4 = unetUp(filters[3], upsample_mode, need_bias, pad)
+        self.up3 = unetUp(filters[2], upsample_mode, need_bias, pad)
+        self.up2 = unetUp(filters[1], upsample_mode, need_bias, pad)
+        self.up1 = unetUp(filters[0], upsample_mode, need_bias, pad)
 
         self.final = conv(filters[0], num_output_channels, 1, bias=need_bias, pad=pad)
 
-    # Implement forward method as necessary, adjusting for removed layers.
+        if need_sigmoid: 
+            self.final = nn.Sequential(self.final, nn.Sigmoid())
 
-def forward(self, inputs):
-    # Downsample 
-    downs = [inputs]
-    down = nn.AvgPool2d(2, 2)
-    for i in range(3):  # Changed from range(4 + self.more_layers) to reflect removed layer
-        downs.append(down(downs[-1]))
+    def forward(self, inputs):
 
-    in64 = self.start(inputs)
-    if self.concat_x:
-        in64 = torch.cat([in64, downs[0]], 1)
+        # Downsample 
+        downs = [inputs]
+        down = nn.AvgPool2d(2, 2)
+        for i in range(4 + self.more_layers):
+            downs.append(down(downs[-1]))
 
-    down1 = self.down1(in64)
-    if self.concat_x:
-        down1 = torch.cat([down1, downs[1]], 1)
+        in64 = self.start(inputs)
+        if self.concat_x:
+            in64 = torch.cat([in64, downs[0]], 1)
 
-    down2 = self.down2(down1)
-    if self.concat_x:
-        down2 = torch.cat([down2, downs[2]], 1)
+        down1 = self.down1(in64)
+        if self.concat_x:
+            down1 = torch.cat([down1, downs[1]], 1)
 
-    down3 = self.down3(down2)
-    if self.concat_x:
-        down3 = torch.cat([down3, downs[3]], 1)
+        down2 = self.down2(down1)
+        if self.concat_x:
+            down2 = torch.cat([down2, downs[2]], 1)
 
-    # Removed down4 and corresponding upsampling logic
-    # Now directly using down3 for upsampling
+        down3 = self.down3(down2)
+        if self.concat_x:
+            down3 = torch.cat([down3, downs[3]], 1)
 
-    up3 = self.up3(down3, down2)  # now down3 is directly connected to up3
-    up2 = self.up2(up3, down1)
-    up1 = self.up1(up2, in64)
+        down4 = self.down4(down3)
+        if self.concat_x:
+            down4 = torch.cat([down4, downs[4]], 1)
 
-    return self.final(up1)
+        if self.more_layers > 0:
+            prevs = [down4]
+            for kk, d in enumerate(self.more_downs):
+                # print(prevs[-1].size())
+                out = d(prevs[-1])
+                if self.concat_x:
+                    out = torch.cat([out,  downs[kk + 5]], 1)
 
+                prevs.append(out)
+
+            up_ = self.more_ups[-1](prevs[-1], prevs[-2])
+            for idx in range(self.more_layers - 1):
+                l = self.more_ups[self.more - idx - 2]
+                up_= l(up_, prevs[self.more - idx - 2])
+        else:
+            up_= down4
+
+        up4= self.up4(up_, down3)
+        up3= self.up3(up4, down2)
+        up2= self.up2(up3, down1)
+        up1= self.up1(up2, in64)
+
+        return self.final(up1)
 
 class MultiScaleUNet(nn.Module):
     def __init__(self, unet_models):
