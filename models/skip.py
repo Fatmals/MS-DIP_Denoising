@@ -111,8 +111,8 @@ def multi_scale_skip(input_depth, num_output_channels, scales, pad='reflection')
     for scale in scales:
         model = skip(
             input_depth, num_output_channels,
-            num_channels_down=[8, 16, 32, 32, 64], #before [8, 16, 32, 64, 128]
-            num_channels_up=[8, 16, 32, 32, 64],
+            num_channels_down=[8, 16, 32, 64, 64], #before [8, 16, 32, 64, 128]
+            num_channels_up=[8, 16, 32, 64, 64],
             num_channels_skip=[0, 0, 0, 4, 4],
             upsample_mode='bilinear',
             need_sigmoid=True, need_bias=True, pad=pad, act_fun='LeakyReLU'
