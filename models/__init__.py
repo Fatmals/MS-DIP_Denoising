@@ -2,8 +2,7 @@ from .skip import skip
 from .skip import multi_scale_skip
 from .texture_nets import get_texture_nets
 from .resnet import ResNet
-from .unet import UNet, MultiScaleUNet  # ✅ Import MultiScaleUNet from unet.py
-
+from .multi_scale_unet import  MultiScaleUNet  # ✅ Import MultiScaleUNet from multi_scale_unet.py
 import torch.nn as nn
 
 
