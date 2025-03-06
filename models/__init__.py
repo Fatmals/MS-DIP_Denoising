@@ -7,7 +7,7 @@ import torch.nn as nn
 
 
 def get_net(input_depth, NET_TYPE, pad, upsample_mode, n_channels=3, act_fun='LeakyReLU', 
-            skip_n33d=64, skip_n33u=64, skip_n11=4, scales=[1.0], num_scales=5, downsample_mode='stride'):
+            skip_n33d=128, skip_n33u=128, skip_n11=4, scales=[1.0], num_scales=5, downsample_mode='stride'):
     """
     Constructs a multi-scale version of the network.
     Initializes multiple networks (one per scale) and fuses results.
