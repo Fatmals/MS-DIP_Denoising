@@ -195,7 +195,7 @@ def torch_to_np(img_var):
     return img_var.detach().cpu().numpy()[0]
 
 
-def optimize(optimizer_type, parameters, closure, LR, num_iter):
+def optimize(optimizer_type, parameters, closure, LR, num_iter, momentum=0.9, beta1=0.9, beta2=0.999, alpha=0.99):
     """Runs optimization loop.
 
     Args:
@@ -231,7 +231,7 @@ def optimize(optimizer_type, parameters, closure, LR, num_iter):
 # additional
     elif optimizer_type == 'SGD':
         print('Starting optimization with SGD')
-        optimizer = torch.optim.SGD(parameters, lr=LR, momentum=0.9)
+        optimizer = torch.optim.SGD(parameters, lr=LR, momentum=momentum)
     
         
         for j in range(num_iter):
@@ -241,7 +241,16 @@ def optimize(optimizer_type, parameters, closure, LR, num_iter):
 
     elif optimizer_type == 'Adamax':
         print('Starting optimization with Adamax')
-        optimizer = torch.optim.Adamax(parameters, lr=LR, betas=(0.8, 0.999), eps=1e-07, weight_decay=0)
+        optimizer = torch.optim.Adamax(parameters, lr=LR, betas=(beta1, beta2), eps=1e-07, weight_decay=0)
+
+        for j in range(num_iter):
+            optimizer.zero_grad()
+            closure()
+            optimizer.step()
+
+    elif optimizer_type == 'RMSprop':
+        print('Starting optimization with RMSprop')
+        optimizer = torch.optim.RMSprop(parameters, lr=LR, alpha=alpha, momentum=momentum)
 
         for j in range(num_iter):
             optimizer.zero_grad()
