@@ -241,7 +241,7 @@ def optimize(optimizer_type, parameters, closure, LR, num_iter, momentum=0.9, be
 
     elif optimizer_type == 'Adamax':
         print('Starting optimization with Adamax')
-        optimizer = torch.optim.Adamax(parameters, lr=LR, betas=(beta1, beta2), eps=1e-07, weight_decay=0)
+        optimizer = torch.optim.Adamax(parameters, lr=LR, betas=(0.8, 0.999), eps=1e-07, weight_decay=0)
 
         for j in range(num_iter):
             optimizer.zero_grad()
