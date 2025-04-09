@@ -6,7 +6,7 @@ from .multi_scale_unet import  MultiScaleUNet  # ✅ Import MultiScaleUNet from 
 import torch.nn as nn
 
 
-def get_net(input_depth, NET_TYPE, pad, upsample_mode, n_channels=n_channels, act_fun='LeakyReLU', 
+def get_net(input_depth, NET_TYPE, pad, upsample_mode, n_channels= 3, act_fun='LeakyReLU', 
             skip_n33d=64, skip_n33u=64, skip_n11=4, scales=[1.0], num_scales=5, downsample_mode='stride'):
     """
     Constructs a multi-scale version of the network.
