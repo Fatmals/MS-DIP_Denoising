@@ -27,11 +27,11 @@ MS-DIP aims to improve reconstruction of fine details **and** global structure, 
 
 ## 📂 Features
 
-- 📈 Unsupervised training — no clean images required
-- 🔁 Fusion of multiple DIP models at different scales
-- 🧠 SSIM + MSE loss combination for perceptual and pixel accuracy
-- 🔬 Evaluation metrics: PSNR, SSIM with early stopping
-- ⚙️ Supports Adamax, SGD, RMSProp, Adam optimisers
+- Unsupervised training — no clean images required
+- Fusion of multiple DIP models at different scales
+- SSIM + MSE loss combination for perceptual and pixel accuracy
+- Evaluation metrics: PSNR, SSIM with early stopping
+- Supports Adamax, SGD, RMSProp, Adam optimisers
 
 ---
 
@@ -44,3 +44,19 @@ Install dependencies using the included `environment.yml`:
 ```bash
 conda env create -f environment.yml
 conda activate msdip
+
+---
+
+## 📒 Google Colab
+
+You can run this project directly in Google Colab without any local setup.
+
+👉 [**Open in Google Colab**](https://colab.research.google.com/github/Fatmals/MS-DIP_Denoising/blob/main/denoising.ipynb)
+
+Make sure to **uncomment the first cell** to clone the repo:
+
+```python
+# Clone the GitHub repo into the Colab environment
+!git clone https://github.com/Fatmals/MS-DIP_Denoising.git
+%cd MS-DIP_Denoising
+
