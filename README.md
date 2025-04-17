@@ -35,21 +35,10 @@ MS-DIP aims to improve reconstruction of fine details **and** global structure, 
 
 ---
 
-## 🚀 Getting Started
-
-### 🔧 Installation (Conda)
-
-Install dependencies using the included `environment.yml`:
-
-```bash
-conda env create -f environment.yml
-conda activate msdip
-
----
 
 ## 📒 Google Colab
 
-You can run this project directly in Google Colab without any local setup.
+You can run this project directly in **Google Colab** without any local setup.
 
 👉 [**Open in Google Colab**](https://colab.research.google.com/github/Fatmals/MS-DIP_Denoising/blob/main/denoising.ipynb)
 
@@ -59,4 +48,7 @@ Make sure to **uncomment the first cell** to clone the repo:
 # Clone the GitHub repo into the Colab environment
 !git clone https://github.com/Fatmals/MS-DIP_Denoising.git
 %cd MS-DIP_Denoising
+
+
+
 
