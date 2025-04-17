@@ -1,17 +1,17 @@
-name: deep-image-prior
+name: msdip
 channels:
-- pytorch
-- defaults
+  - pytorch
+  - conda-forge
+  - defaults
 dependencies:
-- jupyter
-- nb_conda
-- numpy
-- pyyaml
-- mkl
-- setuptools
-- cmake
-- cffi
-- pytorch=0.4
-- matplotlib
-- scikit-image
-- torchvision
+  - python=3.8
+  - pytorch=1.13
+  - torchvision
+  - matplotlib
+  - numpy
+  - scipy
+  - scikit-image
+  - jupyter
+  - pip
+  - pip:
+      - imageio
