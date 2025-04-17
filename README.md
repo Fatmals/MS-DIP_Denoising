@@ -34,11 +34,6 @@ MS-DIP aims to improve reconstruction of fine details **and** global structure, 
 - Supports Adamax, SGD, RMSProp, Adam optimisers
 
 ---
-### Alternative to Colab
-
-For local installation, replicate the dependencies listed in environment.yml.
-
----
 ## 📒 Google Colab
 
 
