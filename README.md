@@ -34,29 +34,35 @@ MS-DIP aims to improve reconstruction of fine details **and** global structure, 
 - Supports Adamax, SGD, RMSProp, Adam optimisers
 
 ---
+### Alternative to Colab
 
-
-## 🚀 Getting Started
-
-### 🔧 Installation (Conda)
-
-Install dependencies using the included environment.yml:
-
-bash
-conda env create -f environment.yml
-conda activate msdip
+For local installation, replicate the dependencies listed in environment.yml.
 
 ---
-
 ## 📒 Google Colab
+
 
 You can run this project directly in **Google Colab** without any local setup.
 
 👉 [**Open in Google Colab**](https://colab.research.google.com/github/Fatmals/MS-DIP_Denoising/blob/main/denoising.ipynb)
 
-Make sure to **uncomment the first cell** to clone the repo:
 
-```python
-# Clone the GitHub repo into the Colab environment
-!git clone https://github.com/Fatmals/MS-DIP_Denoising.git
-%cd MS-DIP_Denoising
+---
+### Alternative to Colab
+
+For local installation, replicate the dependencies listed in environment.yml.
+
+---
+
+# Citation
+
+```
+@misc{alsaadi2025msdip,
+  author       = {Fatma Al Saadi},
+  title        = {Multi-Scale Deep Image Prior (MS-DIP) for Image Denoising},
+  year         = {2025},
+}
+
+```
+
+
