@@ -4,7 +4,7 @@ from .common import *
 
 def skip(
         num_input_channels=2, num_output_channels=3, 
-        num_channels_down=[16, 32, 64, 128, 128], num_channels_up=[16, 32, 64, 128, 128], num_channels_skip=[0, 0, 0, 4, 4], #before [16, 32, 64, 128, 128]
+        num_channels_down=[16, 32, 64, 128, 128], num_channels_up=[16, 32, 64, 128, 128], num_channels_skip=[4, 4, 4, 4, 4], #before [16, 32, 64, 128, 128]
         filter_size_down=3, filter_size_up=3, filter_skip_size=1,
         need_sigmoid=True, need_bias=True, 
         pad='zero', upsample_mode='nearest', downsample_mode='stride', act_fun='LeakyReLU', 
